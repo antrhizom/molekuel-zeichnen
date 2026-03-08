@@ -2,56 +2,92 @@
 
 import { useState, useRef, useCallback } from 'react';
 import MoleculeCanvas, { Atom, Bond } from '@/components/MoleculeCanvas';
-import Toolbar from '@/components/Toolbar';
+import FreehandCanvas, { Stroke } from '@/components/FreehandCanvas';
+import Toolbar, { DrawingMode } from '@/components/Toolbar';
 import ExercisePanel from '@/components/ExercisePanel';
 import FeedbackPanel from '@/components/FeedbackPanel';
 import { exercises, Exercise } from '@/lib/exercises';
 
 export default function Home() {
+  // Mode
+  const [mode, setMode] = useState<DrawingMode>('freehand');
+
+  // Structured mode state
   const [selectedTool, setSelectedTool] = useState<'atom' | 'bond' | 'eraser' | 'move'>('atom');
   const [selectedAtom, setSelectedAtom] = useState<string | null>('C');
   const [bondType, setBondType] = useState<1 | 2 | 3>(1);
   const [atoms, setAtoms] = useState<Atom[]>([]);
   const [bonds, setBonds] = useState<Bond[]>([]);
-  const [history, setHistory] = useState<{ atoms: Atom[]; bonds: Bond[] }[]>([]);
+  const [structHistory, setStructHistory] = useState<{ atoms: Atom[]; bonds: Bond[] }[]>([]);
+
+  // Freehand mode state
+  const [penColor, setPenColor] = useState('#222222');
+  const [penSize, setPenSize] = useState(4);
+  const [freehandTool, setFreehandTool] = useState<'pen' | 'eraser'>('pen');
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [strokeHistory, setStrokeHistory] = useState<Stroke[][]>([]);
+
+  // Shared
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [showHints, setShowHints] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-  const saveHistory = useCallback(() => {
-    setHistory((prev) => [...prev.slice(-20), { atoms: [...atoms], bonds: [...bonds] }]);
+  // Structured mode handlers
+  const saveStructHistory = useCallback(() => {
+    setStructHistory((prev) => [...prev.slice(-20), { atoms: [...atoms], bonds: [...bonds] }]);
   }, [atoms, bonds]);
 
   const handleAtomsChange = useCallback(
     (newAtoms: Atom[]) => {
-      saveHistory();
+      saveStructHistory();
       setAtoms(newAtoms);
     },
-    [saveHistory]
+    [saveStructHistory]
   );
 
   const handleBondsChange = useCallback(
     (newBonds: Bond[]) => {
-      saveHistory();
+      saveStructHistory();
       setBonds(newBonds);
     },
-    [saveHistory]
+    [saveStructHistory]
+  );
+
+  // Freehand handlers
+  const handleStrokesChange = useCallback(
+    (newStrokes: Stroke[]) => {
+      setStrokeHistory((prev) => [...prev.slice(-30), [...strokes]]);
+      setStrokes(newStrokes);
+    },
+    [strokes]
   );
 
   const handleUndo = () => {
-    if (history.length === 0) return;
-    const last = history[history.length - 1];
-    setAtoms(last.atoms);
-    setBonds(last.bonds);
-    setHistory((prev) => prev.slice(0, -1));
+    if (mode === 'structured') {
+      if (structHistory.length === 0) return;
+      const last = structHistory[structHistory.length - 1];
+      setAtoms(last.atoms);
+      setBonds(last.bonds);
+      setStructHistory((prev) => prev.slice(0, -1));
+    } else {
+      if (strokeHistory.length === 0) return;
+      const last = strokeHistory[strokeHistory.length - 1];
+      setStrokes(last);
+      setStrokeHistory((prev) => prev.slice(0, -1));
+    }
   };
 
   const handleClear = () => {
-    saveHistory();
-    setAtoms([]);
-    setBonds([]);
+    if (mode === 'structured') {
+      saveStructHistory();
+      setAtoms([]);
+      setBonds([]);
+    } else {
+      setStrokeHistory((prev) => [...prev.slice(-30), [...strokes]]);
+      setStrokes([]);
+    }
   };
 
   const handleExerciseSelect = (exercise: Exercise) => {
@@ -67,6 +103,8 @@ export default function Home() {
     if (!canvas) return null;
     return canvas.toDataURL('image/png');
   };
+
+  const hasContent = mode === 'structured' ? atoms.length > 0 : strokes.length > 0;
 
   const handleAnalyze = async () => {
     const image = getCanvasImage();
@@ -119,6 +157,8 @@ export default function Home() {
         {/* Sidebar */}
         <div className="space-y-4 order-2 lg:order-1">
           <Toolbar
+            mode={mode}
+            onModeChange={setMode}
             selectedTool={selectedTool}
             selectedAtom={selectedAtom}
             bondType={bondType}
@@ -131,6 +171,12 @@ export default function Home() {
               setBondType(type);
               setSelectedTool('bond');
             }}
+            penColor={penColor}
+            penSize={penSize}
+            freehandTool={freehandTool}
+            onPenColorChange={setPenColor}
+            onPenSizeChange={setPenSize}
+            onFreehandToolChange={setFreehandTool}
             onClear={handleClear}
             onUndo={handleUndo}
           />
@@ -147,7 +193,7 @@ export default function Home() {
             feedback={feedback}
             loading={loading}
             onAnalyze={handleAnalyze}
-            hasAtoms={atoms.length > 0}
+            hasAtoms={hasContent}
           />
         </div>
 
@@ -158,15 +204,25 @@ export default function Home() {
             className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
             style={{ height: 'calc(100vh - 140px)', minHeight: '500px' }}
           >
-            <MoleculeCanvas
-              selectedAtom={selectedAtom}
-              selectedTool={selectedTool}
-              bondType={bondType}
-              atoms={atoms}
-              bonds={bonds}
-              onAtomsChange={handleAtomsChange}
-              onBondsChange={handleBondsChange}
-            />
+            {mode === 'freehand' ? (
+              <FreehandCanvas
+                penColor={penColor}
+                penSize={penSize}
+                tool={freehandTool}
+                strokes={strokes}
+                onStrokesChange={handleStrokesChange}
+              />
+            ) : (
+              <MoleculeCanvas
+                selectedAtom={selectedAtom}
+                selectedTool={selectedTool}
+                bondType={bondType}
+                atoms={atoms}
+                bonds={bonds}
+                onAtomsChange={handleAtomsChange}
+                onBondsChange={handleBondsChange}
+              />
+            )}
           </div>
         </div>
       </main>

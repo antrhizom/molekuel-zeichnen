@@ -49,10 +49,27 @@ export default function MoleculeCanvas({
   onAtomsChange,
   onBondsChange,
 }: MoleculeCanvasProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [bondStart, setBondStart] = useState<string | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setSize({ w: Math.round(width), h: Math.round(height) });
+        }
+      }
+    });
+    ro.observe(wrapper);
+    return () => ro.disconnect();
+  }, []);
 
   const getAtomAt = useCallback(
     (x: number, y: number): Atom | null => {
@@ -71,33 +88,32 @@ export default function MoleculeCanvas({
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || size.w === 0 || size.h === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvas.width = size.w * dpr;
+    canvas.height = size.h * dpr;
     ctx.scale(dpr, dpr);
 
     // Background
     ctx.fillStyle = '#FAFAFA';
-    ctx.fillRect(0, 0, rect.width, rect.height);
+    ctx.fillRect(0, 0, size.w, size.h);
 
     // Grid
     ctx.strokeStyle = '#E5E7EB';
     ctx.lineWidth = 0.5;
-    for (let x = 0; x < rect.width; x += 30) {
+    for (let x = 0; x < size.w; x += 30) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
-      ctx.lineTo(x, rect.height);
+      ctx.lineTo(x, size.h);
       ctx.stroke();
     }
-    for (let y = 0; y < rect.height; y += 30) {
+    for (let y = 0; y < size.h; y += 30) {
       ctx.beginPath();
       ctx.moveTo(0, y);
-      ctx.lineTo(rect.width, y);
+      ctx.lineTo(size.w, y);
       ctx.stroke();
     }
 
@@ -182,22 +198,16 @@ export default function MoleculeCanvas({
       ctx.textBaseline = 'middle';
       ctx.fillText(atom.symbol, atom.x, atom.y);
     });
-  }, [atoms, bonds, bondStart, mousePos, selectedTool]);
+  }, [atoms, bonds, bondStart, mousePos, selectedTool, size]);
 
   useEffect(() => {
     draw();
   }, [draw]);
 
-  useEffect(() => {
-    const handleResize = () => draw();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [draw]);
-
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return { x: 0, y: 0 };
+    const rect = wrapper.getBoundingClientRect();
     return {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
@@ -278,17 +288,20 @@ export default function MoleculeCanvas({
   };
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full cursor-crosshair rounded-xl"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={() => {
-        setDragging(null);
-        setBondStart(null);
-        setMousePos(null);
-      }}
-    />
+    <div ref={wrapperRef} className="w-full h-full relative">
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 cursor-crosshair rounded-xl"
+        style={{ width: size.w, height: size.h }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => {
+          setDragging(null);
+          setBondStart(null);
+          setMousePos(null);
+        }}
+      />
+    </div>
   );
 }
