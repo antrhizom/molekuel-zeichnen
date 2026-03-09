@@ -1,4 +1,4 @@
-import { exercises, Exercise } from './exercises';
+import { exercises, Exercise, NotationStyle } from './exercises';
 
 export interface RoundResult {
   roundNumber: number;
@@ -6,6 +6,7 @@ export interface RoundResult {
   score: number;
   feedbackText: string;
   canvasImage: string;
+  notationStyle: NotationStyle;
 }
 
 export type GamePhase = 'START' | 'CHOOSE' | 'DRAW' | 'FEEDBACK' | 'CERTIFICATE';

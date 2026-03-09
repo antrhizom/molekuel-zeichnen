@@ -8,7 +8,7 @@ import FeedbackPanel from '@/components/FeedbackPanel';
 import StartScreen from '@/components/StartScreen';
 import MoleculeChoice from '@/components/MoleculeChoice';
 import Certificate from '@/components/Certificate';
-import { Exercise } from '@/lib/exercises';
+import { Exercise, NotationStyle, NOTATION_LABELS } from '@/lib/exercises';
 import { GamePhase, RoundResult, pickTwoRandomExercises } from '@/lib/game-utils';
 
 export default function Home() {
@@ -19,6 +19,7 @@ export default function Home() {
   const [choices, setChoices] = useState<[Exercise, Exercise] | null>(null);
   const [rounds, setRounds] = useState<RoundResult[]>([]);
   const [usedIds, setUsedIds] = useState<string[]>([]);
+  const [selectedNotation, setSelectedNotation] = useState<NotationStyle>('struktur');
 
   // Drawing mode
   const [mode, setMode] = useState<DrawingMode>('freehand');
@@ -119,8 +120,9 @@ export default function Home() {
     setPhase('CHOOSE');
   };
 
-  const handleChoose = (exercise: Exercise) => {
+  const handleChoose = (exercise: Exercise, notation: NotationStyle) => {
     setCurrentExercise(exercise);
+    setSelectedNotation(notation);
     setUsedIds((prev) => [...prev, exercise.id]);
     resetCanvas();
     setFeedback(null);
@@ -155,6 +157,7 @@ export default function Home() {
           exerciseName: currentExercise.name,
           exerciseFormula: currentExercise.formula,
           exerciseDescription: currentExercise.description,
+          notationStyle: selectedNotation,
         }),
       });
 
@@ -174,6 +177,7 @@ export default function Home() {
           score: data.score ?? 5,
           feedbackText: data.feedback,
           canvasImage: image,
+          notationStyle: selectedNotation,
         };
         setRounds((prev) => [...prev, result]);
         setPhase('FEEDBACK');
@@ -237,7 +241,7 @@ export default function Home() {
               Runde {currentRound}: {currentExercise?.name}
             </h1>
             <p className="text-xs text-gray-500">
-              {currentExercise?.formula} &middot; {currentExercise?.difficulty}
+              {currentExercise?.formula} &middot; {currentExercise?.difficulty} &middot; {NOTATION_LABELS[selectedNotation]}
             </p>
           </div>
         </div>
@@ -309,6 +313,9 @@ export default function Home() {
         onNextRound={handleNextRound}
         onEndGame={handleEndGame}
         hasContent={hasContent}
+        smiles={currentExercise?.smiles ?? null}
+        notationStyle={selectedNotation}
+        moleculeName={currentExercise?.name ?? null}
       />
     </div>
   );

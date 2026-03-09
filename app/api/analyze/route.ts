@@ -1,9 +1,40 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 
+const NOTATION_CRITERIA: Record<string, string> = {
+  lewis: `Die Zeichnung soll in der Lewis-Schreibweise sein.
+Bewertungskriterien:
+- Alle Atome müssen explizit gezeigt werden
+- Alle Bindungen (Einfach-, Doppel-, Dreifachbindungen) müssen korrekt dargestellt sein
+- Freie Elektronenpaare müssen als Punkte oder Striche gezeigt werden
+- Die Oktettregel sollte erfüllt sein`,
+
+  skelett: `Die Zeichnung soll als Skelettformel sein.
+Bewertungskriterien:
+- Kohlenstoffatome werden als Ecken/Enden von Linien dargestellt (nicht beschriftet)
+- Wasserstoffatome an Kohlenstoff werden weggelassen
+- Heteroatome (O, N, S, etc.) müssen explizit beschriftet sein
+- Bindungstypen (Einfach-, Doppelbindungen) müssen korrekt sein`,
+
+  struktur: `Die Zeichnung soll als Strukturformel sein.
+Bewertungskriterien:
+- Alle Atome müssen mit ihrem Symbol beschriftet sein
+- Alle Bindungen müssen als Striche dargestellt sein
+- Bindungstypen (Einfach-, Doppel-, Dreifachbindungen) müssen korrekt sein
+- Freie Elektronenpaare sind nicht erforderlich`,
+
+  keilstrich: `Die Zeichnung soll als Keilstrichformel sein.
+Bewertungskriterien:
+- 3D-Anordnung muss erkennbar sein
+- Keilbindungen (ausgefüllte Keile = nach vorne) müssen vorhanden sein
+- Strichbindungen (gestrichelte Keile = nach hinten) müssen vorhanden sein
+- Bindungswinkel sollen die räumliche Anordnung widerspiegeln`,
+};
+
 export async function POST(req: NextRequest) {
   try {
-    const { image, exerciseName, exerciseFormula, exerciseDescription } = await req.json();
+    const { image, exerciseName, exerciseFormula, exerciseDescription, notationStyle } =
+      await req.json();
 
     if (!image) {
       return NextResponse.json({ error: 'Kein Bild vorhanden' }, { status: 400 });
@@ -21,18 +52,24 @@ export async function POST(req: NextRequest) {
 
     const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
 
+    const notationInfo =
+      notationStyle && NOTATION_CRITERIA[notationStyle]
+        ? `\n${NOTATION_CRITERIA[notationStyle]}\n`
+        : '';
+
     const prompt = exerciseName
       ? `Du bist ein Chemie-Lehrer und analysierst die Molekülzeichnung eines Schülers.
 
 Die Aufgabe war: "${exerciseName}" (${exerciseFormula})
 Beschreibung: ${exerciseDescription}
-
+${notationInfo}
 Analysiere die Zeichnung und gib konstruktives Feedback auf Deutsch:
 
 1. **Bewertung**: Ist das gezeichnete Molekül korrekt? (Korrekt / Teilweise korrekt / Nicht korrekt)
-2. **Erklärung**: Was ist gut gemacht? Was fehlt oder ist falsch?
-3. **Tipps**: Konkrete Verbesserungsvorschläge
-4. **Wissen**: Ein interessanter Fakt über dieses Molekül
+2. **Schreibweise**: Entspricht die Zeichnung der gewählten Schreibweise? Was fehlt oder ist anders?
+3. **Erklärung**: Was ist gut gemacht? Was fehlt oder ist falsch?
+4. **Tipps**: Konkrete Verbesserungsvorschläge
+5. **Wissen**: Ein interessanter Fakt über dieses Molekül
 
 Sei ermutigend und pädagogisch wertvoll. Verwende einfache Sprache.
 

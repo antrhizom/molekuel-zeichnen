@@ -1,3 +1,19 @@
+export type NotationStyle = 'lewis' | 'skelett' | 'struktur' | 'keilstrich';
+
+export const NOTATION_LABELS: Record<NotationStyle, string> = {
+  lewis: 'Lewis-Schreibweise',
+  skelett: 'Skelettformel',
+  struktur: 'Strukturformel',
+  keilstrich: 'Keilstrichformel',
+};
+
+export const NOTATION_DESCRIPTIONS: Record<NotationStyle, string> = {
+  lewis: 'Alle Atome, Bindungen und freie Elektronenpaare',
+  skelett: 'Kohlenstoffgerüst angedeutet, nur Heteroatome gezeigt',
+  struktur: 'Alle Atome mit Bindungen, ohne freie Elektronenpaare',
+  keilstrich: '3D-Darstellung mit Keil- und Strichbindungen',
+};
+
 export interface Exercise {
   id: string;
   name: string;
@@ -5,6 +21,8 @@ export interface Exercise {
   difficulty: 'leicht' | 'mittel' | 'schwer';
   description: string;
   hints: string[];
+  smiles: string;
+  supportedNotations: NotationStyle[];
 }
 
 export const exercises: Exercise[] = [
@@ -19,6 +37,8 @@ export const exercises: Exercise[] = [
       'Der Bindungswinkel beträgt ca. 104.5°',
       'Sauerstoff hat 2 freie Elektronenpaare',
     ],
+    smiles: 'O',
+    supportedNotations: ['lewis', 'struktur'],
   },
   {
     id: 'methan',
@@ -31,6 +51,8 @@ export const exercises: Exercise[] = [
       'Vier Einfachbindungen zu Wasserstoff',
       'Tetraedrische Anordnung',
     ],
+    smiles: 'C',
+    supportedNotations: ['lewis', 'struktur', 'keilstrich'],
   },
   {
     id: 'kohlendioxid',
@@ -43,6 +65,8 @@ export const exercises: Exercise[] = [
       'Zwei Doppelbindungen zu Sauerstoff',
       'Lineares Molekül (180°)',
     ],
+    smiles: 'O=C=O',
+    supportedNotations: ['lewis', 'struktur'],
   },
   {
     id: 'ethanol',
@@ -55,6 +79,8 @@ export const exercises: Exercise[] = [
       'Eine OH-Gruppe am zweiten Kohlenstoff',
       'Insgesamt 6 Wasserstoffatome (5 an C, 1 an O)',
     ],
+    smiles: 'CCO',
+    supportedNotations: ['lewis', 'skelett', 'struktur'],
   },
   {
     id: 'essigsaeure',
@@ -67,6 +93,8 @@ export const exercises: Exercise[] = [
       'Carboxylgruppe: C mit Doppelbindung zu O und Einfachbindung zu OH',
       'Insgesamt 2 Sauerstoffatome',
     ],
+    smiles: 'CC(=O)O',
+    supportedNotations: ['lewis', 'skelett', 'struktur'],
   },
   {
     id: 'ammoniak',
@@ -79,6 +107,8 @@ export const exercises: Exercise[] = [
       'Drei Einfachbindungen zu Wasserstoff',
       'Ein freies Elektronenpaar am Stickstoff',
     ],
+    smiles: 'N',
+    supportedNotations: ['lewis', 'struktur'],
   },
   {
     id: 'benzol',
@@ -91,6 +121,8 @@ export const exercises: Exercise[] = [
       'Abwechselnd Einfach- und Doppelbindungen',
       'An jedem Kohlenstoff ein Wasserstoff',
     ],
+    smiles: 'c1ccccc1',
+    supportedNotations: ['lewis', 'skelett', 'struktur', 'keilstrich'],
   },
   {
     id: 'glucose',
@@ -103,5 +135,7 @@ export const exercises: Exercise[] = [
       'Aldehydgruppe (CHO) am ersten Kohlenstoff',
       'Hydroxylgruppen (OH) an den übrigen Kohlenstoffatomen',
     ],
+    smiles: 'OCC(O)C(O)C(O)C(O)C=O',
+    supportedNotations: ['lewis', 'skelett', 'struktur', 'keilstrich'],
   },
 ];
