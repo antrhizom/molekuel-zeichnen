@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Molekül-Zeichner | Lernumgebung",
-  description: "Interaktive Lernumgebung zum Zeichnen von Molekülen mit KI-Feedback",
+  title: "Molekül-Challenge",
+  description: "Teste dein Wissen über Molekülstrukturen mit KI-Feedback",
 };
 
 export default function RootLayout({

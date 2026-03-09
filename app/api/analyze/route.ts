@@ -34,7 +34,11 @@ Analysiere die Zeichnung und gib konstruktives Feedback auf Deutsch:
 3. **Tipps**: Konkrete Verbesserungsvorschläge
 4. **Wissen**: Ein interessanter Fakt über dieses Molekül
 
-Sei ermutigend und pädagogisch wertvoll. Verwende einfache Sprache.`
+Sei ermutigend und pädagogisch wertvoll. Verwende einfache Sprache.
+
+WICHTIG: Gib am Ende eine Punktzahl von 1 bis 10. Schreibe als allerletzte Zeile nur:
+SCORE: X
+wobei X eine Zahl von 1 bis 10 ist.`
       : `Du bist ein Chemie-Lehrer. Analysiere diese Molekülzeichnung eines Schülers.
 
 Beschreibe auf Deutsch:
@@ -43,7 +47,11 @@ Beschreibe auf Deutsch:
 3. Verbesserungsvorschläge
 4. Ein interessanter Fakt über das Molekül
 
-Sei ermutigend und pädagogisch wertvoll.`;
+Sei ermutigend und pädagogisch wertvoll.
+
+WICHTIG: Gib am Ende eine Punktzahl von 1 bis 10. Schreibe als allerletzte Zeile nur:
+SCORE: X
+wobei X eine Zahl von 1 bis 10 ist.`;
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -77,7 +85,12 @@ Sei ermutigend und pädagogisch wertvoll.`;
       })
       .join('\n');
 
-    return NextResponse.json({ feedback: text });
+    // Parse score from response
+    const scoreMatch = text.match(/SCORE:\s*(\d+)/i);
+    const score = scoreMatch ? Math.min(10, Math.max(1, parseInt(scoreMatch[1], 10))) : 5;
+    const feedbackText = text.replace(/\n?SCORE:\s*\d+\s*$/i, '').trim();
+
+    return NextResponse.json({ feedback: feedbackText, score });
   } catch (error) {
     console.error('Analyse-Fehler:', error);
     const message = error instanceof Error ? error.message : 'Unbekannter Fehler';

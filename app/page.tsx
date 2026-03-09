@@ -4,12 +4,23 @@ import { useState, useRef, useCallback } from 'react';
 import MoleculeCanvas, { Atom, Bond } from '@/components/MoleculeCanvas';
 import FreehandCanvas, { Stroke } from '@/components/FreehandCanvas';
 import Toolbar, { DrawingMode } from '@/components/Toolbar';
-import ExercisePanel from '@/components/ExercisePanel';
 import FeedbackPanel from '@/components/FeedbackPanel';
-import { exercises, Exercise } from '@/lib/exercises';
+import StartScreen from '@/components/StartScreen';
+import MoleculeChoice from '@/components/MoleculeChoice';
+import Certificate from '@/components/Certificate';
+import { Exercise } from '@/lib/exercises';
+import { GamePhase, RoundResult, pickTwoRandomExercises } from '@/lib/game-utils';
 
 export default function Home() {
-  // Mode
+  // Game state
+  const [phase, setPhase] = useState<GamePhase>('START');
+  const [currentRound, setCurrentRound] = useState(1);
+  const [currentExercise, setCurrentExercise] = useState<Exercise | null>(null);
+  const [choices, setChoices] = useState<[Exercise, Exercise] | null>(null);
+  const [rounds, setRounds] = useState<RoundResult[]>([]);
+  const [usedIds, setUsedIds] = useState<string[]>([]);
+
+  // Drawing mode
   const [mode, setMode] = useState<DrawingMode>('freehand');
 
   // Structured mode state
@@ -27,14 +38,14 @@ export default function Home() {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [strokeHistory, setStrokeHistory] = useState<Stroke[][]>([]);
 
-  // Shared
-  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
-  const [showHints, setShowHints] = useState(false);
+  // Feedback
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-  // Structured mode handlers
+  // --- Drawing handlers ---
   const saveStructHistory = useCallback(() => {
     setStructHistory((prev) => [...prev.slice(-20), { atoms: [...atoms], bonds: [...bonds] }]);
   }, [atoms, bonds]);
@@ -55,7 +66,6 @@ export default function Home() {
     [saveStructHistory]
   );
 
-  // Freehand handlers
   const handleStrokesChange = useCallback(
     (newStrokes: Stroke[]) => {
       setStrokeHistory((prev) => [...prev.slice(-30), [...strokes]]);
@@ -90,10 +100,32 @@ export default function Home() {
     }
   };
 
-  const handleExerciseSelect = (exercise: Exercise) => {
-    setSelectedExercise(exercise);
-    setShowHints(false);
+  const resetCanvas = () => {
+    setAtoms([]);
+    setBonds([]);
+    setStrokes([]);
+    setStructHistory([]);
+    setStrokeHistory([]);
+  };
+
+  // --- Game flow ---
+  const startGame = () => {
+    setRounds([]);
+    setUsedIds([]);
+    setCurrentRound(1);
+    resetCanvas();
+    const picks = pickTwoRandomExercises([]);
+    setChoices(picks);
+    setPhase('CHOOSE');
+  };
+
+  const handleChoose = (exercise: Exercise) => {
+    setCurrentExercise(exercise);
+    setUsedIds((prev) => [...prev, exercise.id]);
+    resetCanvas();
     setFeedback(null);
+    setScore(null);
+    setPhase('DRAW');
   };
 
   const getCanvasImage = (): string | null => {
@@ -108,10 +140,11 @@ export default function Home() {
 
   const handleAnalyze = async () => {
     const image = getCanvasImage();
-    if (!image) return;
+    if (!image || !currentExercise) return;
 
     setLoading(true);
     setFeedback(null);
+    setScore(null);
 
     try {
       const res = await fetch('/api/analyze', {
@@ -119,9 +152,9 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image,
-          exerciseName: selectedExercise?.name || null,
-          exerciseFormula: selectedExercise?.formula || null,
-          exerciseDescription: selectedExercise?.description || null,
+          exerciseName: currentExercise.name,
+          exerciseFormula: currentExercise.formula,
+          exerciseDescription: currentExercise.description,
         }),
       });
 
@@ -129,8 +162,21 @@ export default function Home() {
 
       if (data.error) {
         setFeedback(`Fehler: ${data.error}`);
+        setScore(null);
       } else {
         setFeedback(data.feedback);
+        setScore(data.score ?? 5);
+
+        // Save round result
+        const result: RoundResult = {
+          roundNumber: currentRound,
+          exercise: currentExercise,
+          score: data.score ?? 5,
+          feedbackText: data.feedback,
+          canvasImage: image,
+        };
+        setRounds((prev) => [...prev, result]);
+        setPhase('FEEDBACK');
       }
     } catch {
       setFeedback('Verbindungsfehler. Bitte versuche es erneut.');
@@ -139,93 +185,131 @@ export default function Home() {
     }
   };
 
+  const handleNextRound = () => {
+    const nextRound = currentRound + 1;
+    setCurrentRound(nextRound);
+    resetCanvas();
+    setFeedback(null);
+    setScore(null);
+    const picks = pickTwoRandomExercises(usedIds);
+    setChoices(picks);
+    setPhase('CHOOSE');
+  };
+
+  const handleEndGame = () => {
+    setPhase('CERTIFICATE');
+  };
+
+  const handleRestart = () => {
+    setPhase('START');
+    setRounds([]);
+    setUsedIds([]);
+    setCurrentRound(1);
+    resetCanvas();
+    setFeedback(null);
+    setScore(null);
+  };
+
+  // --- Render ---
+  if (phase === 'START') {
+    return <StartScreen onStart={startGame} />;
+  }
+
+  if (phase === 'CHOOSE' && choices) {
+    return <MoleculeChoice roundNumber={currentRound} choices={choices} onSelect={handleChoose} />;
+  }
+
+  if (phase === 'CERTIFICATE') {
+    return <Certificate rounds={rounds} onRestart={handleRestart} />;
+  }
+
+  // DRAW and FEEDBACK phases
   return (
-    <div className="min-h-screen p-4 md:p-6">
-      <header className="max-w-7xl mx-auto mb-6">
+    <div className="h-screen flex flex-col p-4 gap-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-white text-lg">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-sm">
             &#9879;
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Molekül-Zeichner</h1>
-            <p className="text-sm text-gray-500">Interaktive Lernumgebung mit KI-Feedback</p>
+            <h1 className="text-sm font-bold text-gray-900">
+              Runde {currentRound}: {currentExercise?.name}
+            </h1>
+            <p className="text-xs text-gray-500">
+              {currentExercise?.formula} &middot; {currentExercise?.difficulty}
+            </p>
           </div>
         </div>
-      </header>
+        {currentExercise && (
+          <div className="text-xs text-gray-400 max-w-xs text-right hidden sm:block">
+            {currentExercise.description}
+          </div>
+        )}
+      </div>
 
-      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
-        {/* Sidebar */}
-        <div className="space-y-4 order-2 lg:order-1">
-          <Toolbar
-            mode={mode}
-            onModeChange={setMode}
-            selectedTool={selectedTool}
-            selectedAtom={selectedAtom}
-            bondType={bondType}
-            onToolChange={setSelectedTool}
-            onAtomChange={(atom) => {
-              setSelectedAtom(atom);
-              setSelectedTool('atom');
-            }}
-            onBondTypeChange={(type) => {
-              setBondType(type);
-              setSelectedTool('bond');
-            }}
+      {/* Canvas */}
+      <div
+        ref={canvasContainerRef}
+        className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-0"
+      >
+        {mode === 'freehand' ? (
+          <FreehandCanvas
             penColor={penColor}
             penSize={penSize}
-            freehandTool={freehandTool}
-            onPenColorChange={setPenColor}
-            onPenSizeChange={setPenSize}
-            onFreehandToolChange={setFreehandTool}
-            onClear={handleClear}
-            onUndo={handleUndo}
+            tool={freehandTool}
+            strokes={strokes}
+            onStrokesChange={handleStrokesChange}
           />
-
-          <ExercisePanel
-            exercises={exercises}
-            selectedExercise={selectedExercise}
-            onSelect={handleExerciseSelect}
-            showHints={showHints}
-            onToggleHints={() => setShowHints(!showHints)}
+        ) : (
+          <MoleculeCanvas
+            selectedAtom={selectedAtom}
+            selectedTool={selectedTool}
+            bondType={bondType}
+            atoms={atoms}
+            bonds={bonds}
+            onAtomsChange={handleAtomsChange}
+            onBondsChange={handleBondsChange}
           />
+        )}
+      </div>
 
-          <FeedbackPanel
-            feedback={feedback}
-            loading={loading}
-            onAnalyze={handleAnalyze}
-            hasAtoms={hasContent}
-          />
-        </div>
+      {/* Toolbar (horizontal, below canvas) */}
+      <Toolbar
+        mode={mode}
+        onModeChange={setMode}
+        selectedTool={selectedTool}
+        selectedAtom={selectedAtom}
+        bondType={bondType}
+        onToolChange={setSelectedTool}
+        onAtomChange={(atom) => {
+          setSelectedAtom(atom);
+          setSelectedTool('atom');
+        }}
+        onBondTypeChange={(type) => {
+          setBondType(type);
+          setSelectedTool('bond');
+        }}
+        penColor={penColor}
+        penSize={penSize}
+        freehandTool={freehandTool}
+        onPenColorChange={setPenColor}
+        onPenSizeChange={setPenSize}
+        onFreehandToolChange={setFreehandTool}
+        onClear={handleClear}
+        onUndo={handleUndo}
+      />
 
-        {/* Canvas */}
-        <div className="order-1 lg:order-2">
-          <div
-            ref={canvasContainerRef}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
-            style={{ height: 'calc(100vh - 140px)', minHeight: '500px' }}
-          >
-            {mode === 'freehand' ? (
-              <FreehandCanvas
-                penColor={penColor}
-                penSize={penSize}
-                tool={freehandTool}
-                strokes={strokes}
-                onStrokesChange={handleStrokesChange}
-              />
-            ) : (
-              <MoleculeCanvas
-                selectedAtom={selectedAtom}
-                selectedTool={selectedTool}
-                bondType={bondType}
-                atoms={atoms}
-                bonds={bonds}
-                onAtomsChange={handleAtomsChange}
-                onBondsChange={handleBondsChange}
-              />
-            )}
-          </div>
-        </div>
-      </main>
+      {/* Feedback / Submit */}
+      <FeedbackPanel
+        feedback={feedback}
+        score={score}
+        loading={loading}
+        onAnalyze={handleAnalyze}
+        onNextRound={handleNextRound}
+        onEndGame={handleEndGame}
+        hasContent={hasContent}
+      />
     </div>
   );
 }
