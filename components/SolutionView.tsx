@@ -41,7 +41,7 @@ export default function SolutionView({ smiles, notationStyle, moleculeName }: So
 
         mod.parse(
           smiles,
-          (tree: unknown) => {
+          (tree: import('smiles-drawer').ParseTree) => {
             if (cancelled || !canvasRef.current) return;
             drawer.draw(tree, canvasRef.current, 'light', false);
             setLoaded(true);
