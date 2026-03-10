@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { NotationStyle, NOTATION_LABELS } from '@/lib/exercises';
 
 interface SolutionViewProps {
@@ -10,26 +10,36 @@ interface SolutionViewProps {
 }
 
 export default function SolutionView({ smiles, notationStyle, moleculeName }: SolutionViewProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!expanded || !canvasRef.current) return;
+    if (!expanded || !containerRef.current) return;
 
     let cancelled = false;
     setLoaded(false);
     setError(null);
 
-    async function renderMolecule() {
+    const timer = setTimeout(async () => {
       try {
-        const SmilesDrawer = await import('smiles-drawer');
+        if (!containerRef.current || cancelled) return;
+
+        const importedModule = await import('smiles-drawer');
         if (cancelled) return;
 
-        const mod = SmilesDrawer.default || SmilesDrawer;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const SD: any = importedModule.default ?? importedModule;
+        const SvgDrawerClass = SD.SvgDrawer ?? SD.default?.SvgDrawer;
+        const parseFn = SD.parse ?? SD.default?.parse;
 
-        const drawer = new mod.Drawer({
+        if (!SvgDrawerClass || !parseFn) {
+          setError('smiles-drawer Modul konnte nicht geladen werden.');
+          return;
+        }
+
+        const svgDrawer = new SvgDrawerClass({
           width: 400,
           height: 300,
           bondThickness: 1.5,
@@ -39,12 +49,31 @@ export default function SolutionView({ smiles, notationStyle, moleculeName }: So
           terminalCarbons: notationStyle !== 'skelett',
         });
 
-        mod.parse(
+        parseFn(
           smiles,
-          (tree: import('smiles-drawer').ParseTree) => {
-            if (cancelled || !canvasRef.current) return;
-            drawer.draw(tree, canvasRef.current, 'light', false);
-            setLoaded(true);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (tree: any) => {
+            if (cancelled || !containerRef.current) return;
+            try {
+              // Create an SVG element for SvgDrawer
+              const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+              svg.setAttributeNS(null, 'width', '400');
+              svg.setAttributeNS(null, 'height', '300');
+
+              svgDrawer.draw(tree, svg, 'light');
+
+              // Clear previous content and insert SVG
+              const svgContainer = containerRef.current.querySelector('.svg-target');
+              if (svgContainer) {
+                svgContainer.innerHTML = '';
+                svgContainer.appendChild(svg);
+              }
+              setLoaded(true);
+            } catch (drawErr: unknown) {
+              const msg = drawErr instanceof Error ? drawErr.message : 'Zeichenfehler';
+              if (!cancelled) setError(`Darstellung fehlgeschlagen: ${msg}`);
+            }
           },
           (err: Error) => {
             if (!cancelled) setError(`SMILES konnte nicht gelesen werden: ${err.message}`);
@@ -53,11 +82,11 @@ export default function SolutionView({ smiles, notationStyle, moleculeName }: So
       } catch {
         if (!cancelled) setError('Lösung konnte nicht geladen werden.');
       }
-    }
+    }, 50);
 
-    renderMolecule();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [expanded, smiles, notationStyle]);
 
@@ -75,16 +104,14 @@ export default function SolutionView({ smiles, notationStyle, moleculeName }: So
         </span>
       </button>
       {expanded && (
-        <div className="p-4 flex flex-col items-center gap-2 bg-white">
+        <div ref={containerRef} className="p-4 flex flex-col items-center gap-2 bg-white">
           {error ? (
             <p className="text-sm text-red-500">{error}</p>
           ) : (
             <>
-              <canvas
-                ref={canvasRef}
-                width={400}
-                height={300}
-                className="border border-gray-100 rounded-lg bg-white"
+              <div
+                className="svg-target border border-gray-100 rounded-lg bg-white flex items-center justify-center"
+                style={{ width: 400, height: 300 }}
               />
               <p className="text-xs text-gray-500 font-medium">
                 {moleculeName} — {NOTATION_LABELS[notationStyle]}
