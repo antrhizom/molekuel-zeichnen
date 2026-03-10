@@ -1,8 +1,5 @@
 'use client';
 
-import { NotationStyle } from '@/lib/exercises';
-import SolutionView from './SolutionView';
-
 interface FeedbackPanelProps {
   feedback: string | null;
   score: number | null;
@@ -11,9 +8,6 @@ interface FeedbackPanelProps {
   onNextRound: () => void;
   onEndGame: () => void;
   hasContent: boolean;
-  smiles: string | null;
-  notationStyle: NotationStyle;
-  moleculeName: string | null;
 }
 
 export default function FeedbackPanel({
@@ -24,9 +18,6 @@ export default function FeedbackPanel({
   onNextRound,
   onEndGame,
   hasContent,
-  smiles,
-  notationStyle,
-  moleculeName,
 }: FeedbackPanelProps) {
   if (feedback && score !== null) {
     const scoreColor =
@@ -55,15 +46,6 @@ export default function FeedbackPanel({
             {feedback}
           </div>
         </div>
-
-        {/* Solution image */}
-        {smiles && moleculeName && (
-          <SolutionView
-            smiles={smiles}
-            notationStyle={notationStyle}
-            moleculeName={moleculeName}
-          />
-        )}
 
         {/* Actions */}
         <div className="flex gap-2">

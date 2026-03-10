@@ -313,9 +313,9 @@ export default function Home() {
         onNextRound={handleNextRound}
         onEndGame={handleEndGame}
         hasContent={hasContent}
-        smiles={currentExercise?.smiles ?? null}
-        notationStyle={selectedNotation}
-        moleculeName={currentExercise?.name ?? null}
+
+
+
       />
     </div>
   );
