@@ -35,10 +35,10 @@ interface ToolbarProps {
   mode: DrawingMode;
   onModeChange: (mode: DrawingMode) => void;
   // Structured mode
-  selectedTool: 'atom' | 'bond' | 'eraser' | 'move';
+  selectedTool: 'atom' | 'bond' | 'eraser' | 'move' | 'electron-pair';
   selectedAtom: string | null;
   bondType: 1 | 2 | 3;
-  onToolChange: (tool: 'atom' | 'bond' | 'eraser' | 'move') => void;
+  onToolChange: (tool: 'atom' | 'bond' | 'eraser' | 'move' | 'electron-pair') => void;
   onAtomChange: (atom: string) => void;
   onBondTypeChange: (type: 1 | 2 | 3) => void;
   // Freehand mode
@@ -297,6 +297,17 @@ export default function Toolbar({
                   {type === 1 ? '—' : type === 2 ? '=' : '\u2261'}
                 </button>
               ))}
+              <button
+                onClick={() => onToolChange('electron-pair')}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  selectedTool === 'electron-pair'
+                    ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Freies Elektronenpaar an Atom platzieren"
+              >
+                ∶
+              </button>
             </div>
           </>
         )}

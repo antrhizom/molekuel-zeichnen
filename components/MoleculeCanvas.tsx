@@ -17,6 +17,12 @@ export interface Bond {
   type: 1 | 2 | 3;
 }
 
+export interface ElectronPair {
+  id: string;
+  atomId: string;
+  angle: number; // radians, direction from atom center
+}
+
 const ATOM_RADIUS = 22;
 
 const ATOM_COLORS: Record<string, string> = {
@@ -32,12 +38,14 @@ const ATOM_COLORS: Record<string, string> = {
 
 interface MoleculeCanvasProps {
   selectedAtom: string | null;
-  selectedTool: 'atom' | 'bond' | 'eraser' | 'move';
+  selectedTool: 'atom' | 'bond' | 'eraser' | 'move' | 'electron-pair';
   bondType: 1 | 2 | 3;
   atoms: Atom[];
   bonds: Bond[];
+  electronPairs: ElectronPair[];
   onAtomsChange: (atoms: Atom[]) => void;
   onBondsChange: (bonds: Bond[]) => void;
+  onElectronPairsChange: (pairs: ElectronPair[]) => void;
 }
 
 export default function MoleculeCanvas({
@@ -46,8 +54,10 @@ export default function MoleculeCanvas({
   bondType,
   atoms,
   bonds,
+  electronPairs,
   onAtomsChange,
   onBondsChange,
+  onElectronPairsChange,
 }: MoleculeCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -182,7 +192,6 @@ export default function MoleculeCanvas({
 
     // Draw atoms
     atoms.forEach((atom) => {
-      // Circle background
       ctx.beginPath();
       ctx.arc(atom.x, atom.y, ATOM_RADIUS, 0, Math.PI * 2);
       ctx.fillStyle = '#FFFFFF';
@@ -191,14 +200,49 @@ export default function MoleculeCanvas({
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      // Symbol
       ctx.fillStyle = atom.color === '#FFFFFF' ? '#666' : atom.color;
       ctx.font = 'bold 16px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(atom.symbol, atom.x, atom.y);
     });
-  }, [atoms, bonds, bondStart, mousePos, selectedTool, size]);
+
+    // Draw electron pairs
+    electronPairs.forEach((ep) => {
+      const atom = atoms.find((a) => a.id === ep.atomId);
+      if (!atom) return;
+
+      const dist = ATOM_RADIUS + 12;
+      const cx = atom.x + Math.cos(ep.angle) * dist;
+      const cy = atom.y + Math.sin(ep.angle) * dist;
+
+      // Two dots perpendicular to the angle direction
+      const perpX = -Math.sin(ep.angle) * 4;
+      const perpY = Math.cos(ep.angle) * 4;
+
+      ctx.fillStyle = '#555';
+      ctx.beginPath();
+      ctx.arc(cx + perpX, cy + perpY, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx - perpX, cy - perpY, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Electron pair preview
+    if (selectedTool === 'electron-pair' && mousePos) {
+      const hoverAtom = getAtomAt(mousePos.x, mousePos.y);
+      if (hoverAtom) {
+        ctx.beginPath();
+        ctx.arc(hoverAtom.x, hoverAtom.y, ATOM_RADIUS + 18, 0, Math.PI * 2);
+        ctx.strokeStyle = '#8B5CF644';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }, [atoms, bonds, electronPairs, bondStart, mousePos, selectedTool, size, getAtomAt]);
 
   useEffect(() => {
     draw();
@@ -218,6 +262,20 @@ export default function MoleculeCanvas({
     const pos = getCanvasCoords(e);
     const clickedAtom = getAtomAt(pos.x, pos.y);
 
+    if (selectedTool === 'electron-pair') {
+      if (clickedAtom) {
+        // Calculate angle from atom center to click position
+        const angle = Math.atan2(pos.y - clickedAtom.y, pos.x - clickedAtom.x);
+        const newPair: ElectronPair = {
+          id: `ep_${Date.now()}`,
+          atomId: clickedAtom.id,
+          angle,
+        };
+        onElectronPairsChange([...electronPairs, newPair]);
+      }
+      return;
+    }
+
     if (selectedTool === 'atom' && selectedAtom) {
       if (!clickedAtom) {
         const newAtom: Atom = {
@@ -235,6 +293,7 @@ export default function MoleculeCanvas({
       }
     } else if (selectedTool === 'eraser') {
       if (clickedAtom) {
+        onElectronPairsChange(electronPairs.filter((ep) => ep.atomId !== clickedAtom.id));
         onBondsChange(bonds.filter((b) => b.from !== clickedAtom.id && b.to !== clickedAtom.id));
         onAtomsChange(atoms.filter((a) => a.id !== clickedAtom.id));
       }
@@ -247,6 +306,10 @@ export default function MoleculeCanvas({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const pos = getCanvasCoords(e);
+
+    if (selectedTool === 'electron-pair') {
+      setMousePos(pos);
+    }
 
     if (selectedTool === 'bond' && bondStart) {
       setMousePos(pos);

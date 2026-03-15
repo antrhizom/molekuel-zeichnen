@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import MoleculeCanvas, { Atom, Bond } from '@/components/MoleculeCanvas';
+import MoleculeCanvas, { Atom, Bond, ElectronPair } from '@/components/MoleculeCanvas';
 import FreehandCanvas, { Stroke } from '@/components/FreehandCanvas';
 import Toolbar, { DrawingMode, FreehandTool } from '@/components/Toolbar';
 import FeedbackPanel from '@/components/FeedbackPanel';
@@ -10,6 +10,13 @@ import MoleculeChoice from '@/components/MoleculeChoice';
 import Certificate from '@/components/Certificate';
 import { Exercise, NotationStyle, NOTATION_LABELS } from '@/lib/exercises';
 import { GamePhase, RoundResult, pickTwoRandomExercises } from '@/lib/game-utils';
+
+const TUTORIAL_STEPS = [
+  { title: 'Atome platzieren', desc: 'Wähle ein Element (C, H, O...) und klicke auf die Zeichenfläche.' },
+  { title: 'Bindungen ziehen', desc: 'Wähle — = oder ≡, dann ziehe von einem Atom zum anderen.' },
+  { title: 'Elektronenpaare', desc: 'Wähle ∶ und klicke auf ein Atom, um freie Elektronenpaare zu setzen.' },
+  { title: 'Freihand ergänzen', desc: 'Wechsle zu «Freihand» um mit dem Stift Details zu ergänzen.' },
+];
 
 export default function Home() {
   // Game state
@@ -21,16 +28,20 @@ export default function Home() {
   const [usedIds, setUsedIds] = useState<string[]>([]);
   const [selectedNotation, setSelectedNotation] = useState<NotationStyle>('struktur');
 
+  // Tutorial
+  const [showTutorial, setShowTutorial] = useState(true);
+
   // Drawing mode
-  const [mode, setMode] = useState<DrawingMode>('freehand');
+  const [mode, setMode] = useState<DrawingMode>('structured');
 
   // Structured mode state
-  const [selectedTool, setSelectedTool] = useState<'atom' | 'bond' | 'eraser' | 'move'>('atom');
+  const [selectedTool, setSelectedTool] = useState<'atom' | 'bond' | 'eraser' | 'move' | 'electron-pair'>('atom');
   const [selectedAtom, setSelectedAtom] = useState<string | null>('C');
   const [bondType, setBondType] = useState<1 | 2 | 3>(1);
   const [atoms, setAtoms] = useState<Atom[]>([]);
   const [bonds, setBonds] = useState<Bond[]>([]);
-  const [structHistory, setStructHistory] = useState<{ atoms: Atom[]; bonds: Bond[] }[]>([]);
+  const [electronPairs, setElectronPairs] = useState<ElectronPair[]>([]);
+  const [structHistory, setStructHistory] = useState<{ atoms: Atom[]; bonds: Bond[]; electronPairs: ElectronPair[] }[]>([]);
 
   // Freehand mode state
   const [penColor, setPenColor] = useState('#222222');
@@ -48,8 +59,8 @@ export default function Home() {
 
   // --- Drawing handlers ---
   const saveStructHistory = useCallback(() => {
-    setStructHistory((prev) => [...prev.slice(-20), { atoms: [...atoms], bonds: [...bonds] }]);
-  }, [atoms, bonds]);
+    setStructHistory((prev) => [...prev.slice(-20), { atoms: [...atoms], bonds: [...bonds], electronPairs: [...electronPairs] }]);
+  }, [atoms, bonds, electronPairs]);
 
   const handleAtomsChange = useCallback(
     (newAtoms: Atom[]) => {
@@ -63,6 +74,14 @@ export default function Home() {
     (newBonds: Bond[]) => {
       saveStructHistory();
       setBonds(newBonds);
+    },
+    [saveStructHistory]
+  );
+
+  const handleElectronPairsChange = useCallback(
+    (newPairs: ElectronPair[]) => {
+      saveStructHistory();
+      setElectronPairs(newPairs);
     },
     [saveStructHistory]
   );
@@ -81,6 +100,7 @@ export default function Home() {
       const last = structHistory[structHistory.length - 1];
       setAtoms(last.atoms);
       setBonds(last.bonds);
+      setElectronPairs(last.electronPairs);
       setStructHistory((prev) => prev.slice(0, -1));
     } else {
       if (strokeHistory.length === 0) return;
@@ -95,6 +115,7 @@ export default function Home() {
       saveStructHistory();
       setAtoms([]);
       setBonds([]);
+      setElectronPairs([]);
     } else {
       setStrokeHistory((prev) => [...prev.slice(-30), [...strokes]]);
       setStrokes([]);
@@ -104,6 +125,7 @@ export default function Home() {
   const resetCanvas = () => {
     setAtoms([]);
     setBonds([]);
+    setElectronPairs([]);
     setStrokes([]);
     setStructHistory([]);
     setStrokeHistory([]);
@@ -170,7 +192,6 @@ export default function Home() {
         setFeedback(data.feedback);
         setScore(data.score ?? 5);
 
-        // Save round result
         const result: RoundResult = {
           roundNumber: currentRound,
           exercise: currentExercise,
@@ -254,12 +275,12 @@ export default function Home() {
         )}
       </div>
 
-      {/* Main content area: Canvas + optional Feedback side by side on desktop */}
+      {/* Main content area */}
       <div className={`flex-1 min-h-0 flex ${showFeedback ? 'gap-3' : ''}`}>
         {/* Canvas - always visible */}
         <div
           ref={canvasContainerRef}
-          className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-0 ${
+          className={`relative bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-0 ${
             showFeedback ? 'flex-1' : 'w-full'
           }`}
         >
@@ -278,13 +299,49 @@ export default function Home() {
               bondType={bondType}
               atoms={atoms}
               bonds={bonds}
+              electronPairs={electronPairs}
               onAtomsChange={handleAtomsChange}
               onBondsChange={handleBondsChange}
+              onElectronPairsChange={handleElectronPairsChange}
             />
+          )}
+
+          {/* Tutorial overlay */}
+          {showTutorial && phase === 'DRAW' && !showFeedback && atoms.length === 0 && strokes.length === 0 && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 p-4">
+              <div className="max-w-sm w-full bg-white rounded-2xl shadow-lg border border-gray-200 p-5 space-y-4">
+                <h3 className="text-base font-bold text-gray-900 text-center">Kurz-Anleitung</h3>
+                <div className="space-y-3">
+                  {TUTORIAL_STEPS.map((step, i) => (
+                    <div key={i} className="flex gap-3 items-start">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                        {i + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{step.title}</p>
+                        <p className="text-xs text-gray-500">{step.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setShowTutorial(false)}
+                  className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-purple-700 transition-all"
+                >
+                  Verstanden, los geht&apos;s!
+                </button>
+                <button
+                  onClick={() => setShowTutorial(false)}
+                  className="w-full py-1.5 text-gray-400 text-xs hover:text-gray-600 transition-all"
+                >
+                  Nicht mehr anzeigen
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Feedback panel - side by side on desktop, below on mobile */}
+        {/* Feedback panel - side by side on desktop */}
         {showFeedback && (
           <div className="w-80 shrink-0 hidden md:block overflow-y-auto">
             <FeedbackPanel
@@ -328,7 +385,7 @@ export default function Home() {
         />
       )}
 
-      {/* Feedback panel - mobile version below canvas */}
+      {/* Feedback panel - mobile version */}
       {showFeedback && (
         <div className="md:hidden">
           <FeedbackPanel
@@ -343,7 +400,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Submit button (only during DRAW phase) */}
+      {/* Submit button */}
       {!showFeedback && (
         <FeedbackPanel
           feedback={null}
