@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import MoleculeCanvas, { Atom, Bond } from '@/components/MoleculeCanvas';
 import FreehandCanvas, { Stroke } from '@/components/FreehandCanvas';
-import Toolbar, { DrawingMode } from '@/components/Toolbar';
+import Toolbar, { DrawingMode, FreehandTool } from '@/components/Toolbar';
 import FeedbackPanel from '@/components/FeedbackPanel';
 import StartScreen from '@/components/StartScreen';
 import MoleculeChoice from '@/components/MoleculeChoice';
@@ -35,7 +35,7 @@ export default function Home() {
   // Freehand mode state
   const [penColor, setPenColor] = useState('#222222');
   const [penSize, setPenSize] = useState(4);
-  const [freehandTool, setFreehandTool] = useState<'pen' | 'eraser'>('pen');
+  const [freehandTool, setFreehandTool] = useState<FreehandTool>('pen');
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [strokeHistory, setStrokeHistory] = useState<Stroke[][]>([]);
 
@@ -227,9 +227,11 @@ export default function Home() {
     return <Certificate rounds={rounds} onRestart={handleRestart} />;
   }
 
+  const showFeedback = phase === 'FEEDBACK' && feedback && score !== null;
+
   // DRAW and FEEDBACK phases
   return (
-    <div className="h-screen flex flex-col p-4 gap-3">
+    <div className="h-screen flex flex-col p-3 gap-2">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -252,71 +254,107 @@ export default function Home() {
         )}
       </div>
 
-      {/* Canvas */}
-      <div
-        ref={canvasContainerRef}
-        className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-0"
-      >
-        {mode === 'freehand' ? (
-          <FreehandCanvas
-            penColor={penColor}
-            penSize={penSize}
-            tool={freehandTool}
-            strokes={strokes}
-            onStrokesChange={handleStrokesChange}
-          />
-        ) : (
-          <MoleculeCanvas
-            selectedAtom={selectedAtom}
-            selectedTool={selectedTool}
-            bondType={bondType}
-            atoms={atoms}
-            bonds={bonds}
-            onAtomsChange={handleAtomsChange}
-            onBondsChange={handleBondsChange}
-          />
+      {/* Main content area: Canvas + optional Feedback side by side on desktop */}
+      <div className={`flex-1 min-h-0 flex ${showFeedback ? 'gap-3' : ''}`}>
+        {/* Canvas - always visible */}
+        <div
+          ref={canvasContainerRef}
+          className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-0 ${
+            showFeedback ? 'flex-1' : 'w-full'
+          }`}
+        >
+          {mode === 'freehand' ? (
+            <FreehandCanvas
+              penColor={penColor}
+              penSize={penSize}
+              tool={freehandTool}
+              strokes={strokes}
+              onStrokesChange={handleStrokesChange}
+            />
+          ) : (
+            <MoleculeCanvas
+              selectedAtom={selectedAtom}
+              selectedTool={selectedTool}
+              bondType={bondType}
+              atoms={atoms}
+              bonds={bonds}
+              onAtomsChange={handleAtomsChange}
+              onBondsChange={handleBondsChange}
+            />
+          )}
+        </div>
+
+        {/* Feedback panel - side by side on desktop, below on mobile */}
+        {showFeedback && (
+          <div className="w-80 shrink-0 hidden md:block overflow-y-auto">
+            <FeedbackPanel
+              feedback={feedback}
+              score={score}
+              loading={loading}
+              onAnalyze={handleAnalyze}
+              onNextRound={handleNextRound}
+              onEndGame={handleEndGame}
+              hasContent={hasContent}
+            />
+          </div>
         )}
       </div>
 
-      {/* Toolbar (horizontal, below canvas) */}
-      <Toolbar
-        mode={mode}
-        onModeChange={setMode}
-        selectedTool={selectedTool}
-        selectedAtom={selectedAtom}
-        bondType={bondType}
-        onToolChange={setSelectedTool}
-        onAtomChange={(atom) => {
-          setSelectedAtom(atom);
-          setSelectedTool('atom');
-        }}
-        onBondTypeChange={(type) => {
-          setBondType(type);
-          setSelectedTool('bond');
-        }}
-        penColor={penColor}
-        penSize={penSize}
-        freehandTool={freehandTool}
-        onPenColorChange={setPenColor}
-        onPenSizeChange={setPenSize}
-        onFreehandToolChange={setFreehandTool}
-        onClear={handleClear}
-        onUndo={handleUndo}
-      />
+      {/* Toolbar */}
+      {!showFeedback && (
+        <Toolbar
+          mode={mode}
+          onModeChange={setMode}
+          selectedTool={selectedTool}
+          selectedAtom={selectedAtom}
+          bondType={bondType}
+          onToolChange={setSelectedTool}
+          onAtomChange={(atom) => {
+            setSelectedAtom(atom);
+            setSelectedTool('atom');
+          }}
+          onBondTypeChange={(type) => {
+            setBondType(type);
+            setSelectedTool('bond');
+          }}
+          penColor={penColor}
+          penSize={penSize}
+          freehandTool={freehandTool}
+          onPenColorChange={setPenColor}
+          onPenSizeChange={setPenSize}
+          onFreehandToolChange={setFreehandTool}
+          onClear={handleClear}
+          onUndo={handleUndo}
+        />
+      )}
 
-      {/* Feedback / Submit */}
-      <FeedbackPanel
-        feedback={feedback}
-        score={score}
-        loading={loading}
-        onAnalyze={handleAnalyze}
-        onNextRound={handleNextRound}
-        onEndGame={handleEndGame}
-        hasContent={hasContent}
+      {/* Feedback panel - mobile version below canvas */}
+      {showFeedback && (
+        <div className="md:hidden">
+          <FeedbackPanel
+            feedback={feedback}
+            score={score}
+            loading={loading}
+            onAnalyze={handleAnalyze}
+            onNextRound={handleNextRound}
+            onEndGame={handleEndGame}
+            hasContent={hasContent}
+          />
+        </div>
+      )}
 
-
-
-      />
+      {/* Submit button (only during DRAW phase) */}
+      {!showFeedback && (
+        <FeedbackPanel
+          feedback={null}
+          score={null}
+          loading={loading}
+          onAnalyze={handleAnalyze}
+          onNextRound={handleNextRound}
+          onEndGame={handleEndGame}
+          hasContent={hasContent}
+        />
+      )}
     </div>
   );
 }

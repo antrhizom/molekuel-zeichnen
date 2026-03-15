@@ -29,6 +29,7 @@ const PEN_SIZES = [
 ];
 
 export type DrawingMode = 'freehand' | 'structured';
+export type FreehandTool = 'pen' | 'eraser' | 'electron-pair' | 'single-bond' | 'double-bond' | 'triple-bond';
 
 interface ToolbarProps {
   mode: DrawingMode;
@@ -43,10 +44,10 @@ interface ToolbarProps {
   // Freehand mode
   penColor: string;
   penSize: number;
-  freehandTool: 'pen' | 'eraser';
+  freehandTool: FreehandTool;
   onPenColorChange: (color: string) => void;
   onPenSizeChange: (size: number) => void;
-  onFreehandToolChange: (tool: 'pen' | 'eraser') => void;
+  onFreehandToolChange: (tool: FreehandTool) => void;
   // Common
   onClear: () => void;
   onUndo: () => void;
@@ -70,9 +71,12 @@ export default function Toolbar({
   onClear,
   onUndo,
 }: ToolbarProps) {
+  const isChemTool = (t: FreehandTool) =>
+    ['electron-pair', 'single-bond', 'double-bond', 'triple-bond'].includes(t);
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
         {/* Modus-Toggle */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
           <button
@@ -97,30 +101,31 @@ export default function Toolbar({
           </button>
         </div>
 
-        {/* Separator */}
         <div className="w-px h-6 bg-gray-200" />
 
         {mode === 'freehand' ? (
           <>
-            {/* Freehand tools */}
+            {/* Freehand drawing tools */}
             <div className="flex gap-1">
               <button
                 onClick={() => onFreehandToolChange('pen')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   freehandTool === 'pen'
                     ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
+                title="Freihand-Stift"
               >
                 Stift
               </button>
               <button
                 onClick={() => onFreehandToolChange('eraser')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   freehandTool === 'eraser'
                     ? 'bg-red-100 text-red-700 ring-1 ring-red-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
+                title="Radierer"
               >
                 Radierer
               </button>
@@ -128,41 +133,94 @@ export default function Toolbar({
 
             <div className="w-px h-6 bg-gray-200" />
 
-            {/* Colors */}
-            <div className="flex gap-1.5 items-center">
-              {PEN_COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  onClick={() => onPenColorChange(c.value)}
-                  title={c.name}
-                  className={`w-6 h-6 rounded-full transition-all border-2 ${
-                    penColor === c.value
-                      ? 'border-blue-500 scale-110 shadow-sm'
-                      : 'border-gray-200 hover:scale-105'
-                  }`}
-                  style={{ backgroundColor: c.value }}
-                />
-              ))}
+            {/* Chemistry stamp tools */}
+            <div className="flex gap-1">
+              <button
+                onClick={() => onFreehandToolChange('electron-pair')}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  freehandTool === 'electron-pair'
+                    ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Freies Elektronenpaar platzieren (2 Punkte)"
+              >
+                ∶
+              </button>
+              <button
+                onClick={() => onFreehandToolChange('single-bond')}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  freehandTool === 'single-bond'
+                    ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Einfachbindung zeichnen"
+              >
+                —
+              </button>
+              <button
+                onClick={() => onFreehandToolChange('double-bond')}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  freehandTool === 'double-bond'
+                    ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Doppelbindung zeichnen"
+              >
+                =
+              </button>
+              <button
+                onClick={() => onFreehandToolChange('triple-bond')}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  freehandTool === 'triple-bond'
+                    ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Dreifachbindung zeichnen"
+              >
+                ≡
+              </button>
             </div>
 
             <div className="w-px h-6 bg-gray-200" />
 
-            {/* Pen sizes */}
-            <div className="flex gap-1">
-              {PEN_SIZES.map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => onPenSizeChange(s.value)}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    penSize === s.value
-                      ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {s.name}
-                </button>
-              ))}
-            </div>
+            {/* Colors - only for pen/eraser */}
+            {!isChemTool(freehandTool) && (
+              <>
+                <div className="flex gap-1 items-center">
+                  {PEN_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => onPenColorChange(c.value)}
+                      title={c.name}
+                      className={`w-5 h-5 rounded-full transition-all border-2 ${
+                        penColor === c.value
+                          ? 'border-blue-500 scale-110 shadow-sm'
+                          : 'border-gray-200 hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: c.value }}
+                    />
+                  ))}
+                </div>
+
+                <div className="w-px h-6 bg-gray-200" />
+
+                <div className="flex gap-1">
+                  {PEN_SIZES.map((s) => (
+                    <button
+                      key={s.value}
+                      onClick={() => onPenSizeChange(s.value)}
+                      className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        penSize === s.value
+                          ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </>
         ) : (
           <>
@@ -170,7 +228,7 @@ export default function Toolbar({
             <div className="flex gap-1">
               <button
                 onClick={() => onToolChange('move')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   selectedTool === 'move'
                     ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -180,7 +238,7 @@ export default function Toolbar({
               </button>
               <button
                 onClick={() => onToolChange('eraser')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   selectedTool === 'eraser'
                     ? 'bg-red-100 text-red-700 ring-1 ring-red-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -201,7 +259,7 @@ export default function Toolbar({
                     onToolChange('atom');
                     onAtomChange(atom);
                   }}
-                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
+                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
                     selectedTool === 'atom' && selectedAtom === atom
                       ? 'ring-2 ring-blue-400 scale-110 shadow-sm'
                       : 'hover:scale-105'
@@ -230,7 +288,7 @@ export default function Toolbar({
                     onToolChange('bond');
                     onBondTypeChange(type);
                   }}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     selectedTool === 'bond' && bondType === type
                       ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -245,16 +303,16 @@ export default function Toolbar({
 
         {/* Separator + Undo/Clear */}
         <div className="w-px h-6 bg-gray-200" />
-        <div className="flex gap-1">
+        <div className="flex gap-1 ml-auto">
           <button
             onClick={onUndo}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+            className="px-2 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
           >
             Rückgängig
           </button>
           <button
             onClick={onClear}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-all"
+            className="px-2 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-all"
           >
             Löschen
           </button>

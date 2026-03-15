@@ -1,17 +1,15 @@
-export type NotationStyle = 'lewis' | 'skelett' | 'struktur' | 'keilstrich';
+export type NotationStyle = 'lewis' | 'skelett' | 'struktur';
 
 export const NOTATION_LABELS: Record<NotationStyle, string> = {
   lewis: 'Lewis-Schreibweise',
   skelett: 'Skelettformel',
   struktur: 'Strukturformel',
-  keilstrich: 'Keilstrichformel',
 };
 
 export const NOTATION_DESCRIPTIONS: Record<NotationStyle, string> = {
   lewis: 'Alle Atome, Bindungen und freie Elektronenpaare',
   skelett: 'Kohlenstoffgerüst angedeutet, nur Heteroatome gezeigt',
   struktur: 'Alle Atome mit Bindungen, ohne freie Elektronenpaare',
-  keilstrich: '3D-Darstellung mit Keil- und Strichbindungen',
 };
 
 export interface Exercise {
@@ -52,7 +50,7 @@ export const exercises: Exercise[] = [
       'Tetraedrische Anordnung',
     ],
     smiles: 'C',
-    supportedNotations: ['lewis', 'struktur', 'keilstrich'],
+    supportedNotations: ['lewis', 'struktur'],
   },
   {
     id: 'kohlendioxid',
@@ -122,7 +120,7 @@ export const exercises: Exercise[] = [
       'An jedem Kohlenstoff ein Wasserstoff',
     ],
     smiles: 'c1ccccc1',
-    supportedNotations: ['lewis', 'skelett', 'struktur', 'keilstrich'],
+    supportedNotations: ['lewis', 'skelett', 'struktur'],
   },
   {
     id: 'glucose',
@@ -136,6 +134,6 @@ export const exercises: Exercise[] = [
       'Hydroxylgruppen (OH) an den übrigen Kohlenstoffatomen',
     ],
     smiles: 'OCC(O)C(O)C(O)C(O)C=O',
-    supportedNotations: ['lewis', 'skelett', 'struktur', 'keilstrich'],
+    supportedNotations: ['lewis', 'skelett', 'struktur'],
   },
 ];

@@ -1,29 +1,104 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import type { FreehandTool } from './Toolbar';
 
 export interface Stroke {
   points: { x: number; y: number }[];
   color: string;
   width: number;
+  type?: 'freehand' | 'electron-pair' | 'single-bond' | 'double-bond' | 'triple-bond';
 }
 
 interface FreehandCanvasProps {
   penColor: string;
   penSize: number;
-  tool: 'pen' | 'eraser';
+  tool: FreehandTool;
   strokes: Stroke[];
   onStrokesChange: (strokes: Stroke[]) => void;
 }
 
-function drawStroke(
-  ctx: CanvasRenderingContext2D,
-  points: { x: number; y: number }[],
-  color: string,
-  width: number
-) {
+function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
+  const { points, color, width, type } = stroke;
   if (points.length === 0) return;
 
+  if (type === 'electron-pair') {
+    // Draw two dots (electron pair)
+    const p = points[0];
+    const dotRadius = 3;
+    const gap = 6;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(p.x - gap, p.y, dotRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(p.x + gap, p.y, dotRadius, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  if (type === 'single-bond' && points.length >= 2) {
+    const [start, end] = [points[0], points[points.length - 1]];
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+    return;
+  }
+
+  if (type === 'double-bond' && points.length >= 2) {
+    const [start, end] = [points[0], points[points.length - 1]];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len * 3; // perpendicular offset
+    const ny = dx / len * 3;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(start.x + nx, start.y + ny);
+    ctx.lineTo(end.x + nx, end.y + ny);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(start.x - nx, start.y - ny);
+    ctx.lineTo(end.x - nx, end.y - ny);
+    ctx.stroke();
+    return;
+  }
+
+  if (type === 'triple-bond' && points.length >= 2) {
+    const [start, end] = [points[0], points[points.length - 1]];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len * 4;
+    const ny = dx / len * 4;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    // Center line
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+    // Top line
+    ctx.beginPath();
+    ctx.moveTo(start.x + nx, start.y + ny);
+    ctx.lineTo(end.x + nx, end.y + ny);
+    ctx.stroke();
+    // Bottom line
+    ctx.beginPath();
+    ctx.moveTo(start.x - nx, start.y - ny);
+    ctx.lineTo(end.x - nx, end.y - ny);
+    ctx.stroke();
+    return;
+  }
+
+  // Default freehand stroke
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
   ctx.lineCap = 'round';
@@ -67,6 +142,8 @@ export default function FreehandCanvas({
   const [size, setSize] = useState({ w: 0, h: 0 });
   const currentStrokeRef = useRef<{ x: number; y: number }[]>([]);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  const isBondTool = tool === 'single-bond' || tool === 'double-bond' || tool === 'triple-bond';
 
   // Track container size with ResizeObserver
   useEffect(() => {
@@ -123,16 +200,30 @@ export default function FreehandCanvas({
 
     // Draw saved strokes
     for (const stroke of strokes) {
-      drawStroke(ctx, stroke.points, stroke.color, stroke.width);
+      drawStroke(ctx, stroke);
     }
 
     // Draw current in-progress stroke
     if (currentStrokeRef.current.length > 0) {
-      const c = tool === 'eraser' ? '#FFFFFF' : penColor;
-      const w = tool === 'eraser' ? penSize * 3 : penSize;
-      drawStroke(ctx, currentStrokeRef.current, c, w);
+      if (isBondTool) {
+        // Preview bond as dashed line
+        const pts = currentStrokeRef.current;
+        if (pts.length >= 2) {
+          const preview: Stroke = {
+            points: [pts[0], pts[pts.length - 1]],
+            color: '#222222',
+            width: 2,
+            type: tool as Stroke['type'],
+          };
+          drawStroke(ctx, preview);
+        }
+      } else if (tool === 'pen' || tool === 'eraser') {
+        const c = tool === 'eraser' ? '#FFFFFF' : penColor;
+        const w = tool === 'eraser' ? penSize * 3 : penSize;
+        drawStroke(ctx, { points: currentStrokeRef.current, color: c, width: w, type: 'freehand' });
+      }
     }
-  }, [strokes, penColor, penSize, tool, size]);
+  }, [strokes, penColor, penSize, tool, size, isBondTool]);
 
   useEffect(() => {
     redraw();
@@ -153,22 +244,38 @@ export default function FreehandCanvas({
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     const pos = getCoords(e);
+
+    // Electron pair: single click placement
+    if (tool === 'electron-pair') {
+      const newStroke: Stroke = {
+        points: [pos],
+        color: '#222222',
+        width: 3,
+        type: 'electron-pair',
+      };
+      onStrokesChange([...strokes, newStroke]);
+      return;
+    }
+
     setIsDrawing(true);
     currentStrokeRef.current = [pos];
     lastPointRef.current = pos;
 
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        const dpr = window.devicePixelRatio || 1;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const c = tool === 'eraser' ? '#FFFFFF' : penColor;
-        const w = tool === 'eraser' ? penSize * 3 : penSize;
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, w / 2, 0, Math.PI * 2);
-        ctx.fillStyle = c;
-        ctx.fill();
+    // For pen/eraser, draw the initial dot
+    if (tool === 'pen' || tool === 'eraser') {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          const c = tool === 'eraser' ? '#FFFFFF' : penColor;
+          const w = tool === 'eraser' ? penSize * 3 : penSize;
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, w / 2, 0, Math.PI * 2);
+          ctx.fillStyle = c;
+          ctx.fill();
+        }
       }
     }
   };
@@ -187,6 +294,13 @@ export default function FreehandCanvas({
     currentStrokeRef.current.push(pos);
     lastPointRef.current = pos;
 
+    if (isBondTool) {
+      // Redraw everything to show updated bond preview
+      redraw();
+      return;
+    }
+
+    // For pen/eraser, draw incrementally
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -218,14 +332,28 @@ export default function FreehandCanvas({
     setIsDrawing(false);
 
     if (currentStrokeRef.current.length > 0) {
-      const color = tool === 'eraser' ? '#FFFFFF' : penColor;
-      const width = tool === 'eraser' ? penSize * 3 : penSize;
-      const newStroke: Stroke = {
-        points: [...currentStrokeRef.current],
-        color,
-        width,
-      };
-      onStrokesChange([...strokes, newStroke]);
+      if (isBondTool) {
+        const pts = currentStrokeRef.current;
+        if (pts.length >= 2) {
+          const newStroke: Stroke = {
+            points: [pts[0], pts[pts.length - 1]],
+            color: '#222222',
+            width: 2,
+            type: tool as Stroke['type'],
+          };
+          onStrokesChange([...strokes, newStroke]);
+        }
+      } else {
+        const color = tool === 'eraser' ? '#FFFFFF' : penColor;
+        const width = tool === 'eraser' ? penSize * 3 : penSize;
+        const newStroke: Stroke = {
+          points: [...currentStrokeRef.current],
+          color,
+          width,
+          type: 'freehand',
+        };
+        onStrokesChange([...strokes, newStroke]);
+      }
     }
     currentStrokeRef.current = [];
     lastPointRef.current = null;
@@ -238,7 +366,7 @@ export default function FreehandCanvas({
         width={size.w}
         height={size.h}
         className="absolute inset-0 rounded-xl touch-none"
-        style={{ cursor: 'crosshair', width: size.w, height: size.h }}
+        style={{ cursor: tool === 'electron-pair' ? 'cell' : 'crosshair', width: size.w, height: size.h }}
         onMouseDown={startDrawing}
         onMouseMove={continueDrawing}
         onMouseUp={stopDrawing}
