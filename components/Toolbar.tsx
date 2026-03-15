@@ -78,7 +78,7 @@ export default function Toolbar({
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
         {/* Modus-Toggle */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5" data-tutorial="mode-toggle">
           <button
             onClick={() => onModeChange('freehand')}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
@@ -251,7 +251,7 @@ export default function Toolbar({
             <div className="w-px h-6 bg-gray-200" />
 
             {/* Atoms */}
-            <div className="flex gap-1 items-center">
+            <div className="flex gap-1 items-center" data-tutorial="atoms">
               {ATOMS.map((atom) => (
                 <button
                   key={atom}
@@ -280,7 +280,7 @@ export default function Toolbar({
             <div className="w-px h-6 bg-gray-200" />
 
             {/* Bonds */}
-            <div className="flex gap-1">
+            <div className="flex gap-1" data-tutorial="bonds">
               {([1, 2, 3] as const).map((type) => (
                 <button
                   key={type}
@@ -305,6 +305,7 @@ export default function Toolbar({
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
                 title="Freies Elektronenpaar an Atom platzieren"
+                data-tutorial="electron-pair"
               >
                 ∶
               </button>
